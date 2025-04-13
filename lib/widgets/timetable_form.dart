@@ -5,7 +5,7 @@ import 'package:timetable_manager/utils/colors.dart';
 class TimetableForm extends StatefulWidget {
   final Function(Timetable) onSubmit;
   final Timetable? timetable;
-  
+
   const TimetableForm({
     super.key,
     required this.onSubmit,
@@ -19,43 +19,35 @@ class TimetableForm extends StatefulWidget {
 class _TimetableFormState extends State<TimetableForm> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final Map<String, bool> _selectedDays = {
-    'Monday': false,
-    'Tuesday': false,
-    'Wednesday': false,
-    'Thursday': false,
-    'Friday': false,
-    'Saturday': false,
-    'Sunday': false,
-  };
-  
+  final List<String> _daysOfWeek = [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
+  ];
+  final Set<String> _selectedDays = {};
+
   @override
   void initState() {
     super.initState();
     if (widget.timetable != null) {
       _nameController.text = widget.timetable!.name;
-      for (final day in widget.timetable!.days) {
-        if (_selectedDays.containsKey(day)) {
-          _selectedDays[day] = true;
-        }
-      }
+      _selectedDays.addAll(widget.timetable!.days);
     }
   }
-  
+
   @override
   void dispose() {
     _nameController.dispose();
     super.dispose();
   }
-  
+
   void _handleSubmit() {
     if (_formKey.currentState!.validate()) {
-      final days = _selectedDays.entries
-          .where((entry) => entry.value)
-          .map((entry) => entry.key)
-          .toList();
-      
-      if (days.isEmpty) {
+      if (_selectedDays.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Please select at least one day'),
@@ -64,79 +56,85 @@ class _TimetableFormState extends State<TimetableForm> {
         );
         return;
       }
-      
+
       final timetable = Timetable(
         id: widget.timetable?.id ?? 'temp_id',
         name: _nameController.text.trim(),
-        days: days,
+        days: _selectedDays.toList(),
         isActive: widget.timetable?.isActive ?? false,
       );
-      
+
       widget.onSubmit(timetable);
     }
   }
-  
+
   @override
   Widget build(BuildContext context) {
+    final isEdit = widget.timetable != null;
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(20.0),
       child: Form(
         key: _formKey,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              widget.timetable == null ? 'Add New Timetable' : 'Edit Timetable',
-              style: Theme.of(context).textTheme.titleLarge,
+              isEdit ? 'Edit Timetable' : 'Add New Timetable',
+              style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 24),
             TextFormField(
               controller: _nameController,
               decoration: const InputDecoration(
-                labelText: 'Name',
-                hintText: 'Enter timetable name',
+                labelText: 'Timetable Name',
+                hintText: 'e.g., Semester 1 Schedule',
+                border: OutlineInputBorder(),
               ),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Please enter a name';
-                }
-                return null;
-              },
+              validator: (value) =>
+                  value == null || value.trim().isEmpty ? 'Name is required' : null,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             const Text(
-              'Days:',
+              'Select Days:',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 8),
-            ...
-            _selectedDays.entries.map(
-              (entry) => CheckboxListTile(
-                title: Text(entry.key),
-                value: entry.value,
-                activeColor: AppColors.primaryColor,
-                onChanged: (value) {
-                  setState(() {
-                    _selectedDays[entry.key] = value ?? false;
-                  });
-                },
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-                controlAffinity: ListTileControlAffinity.leading,
-              ),
+            Wrap(
+              spacing: 8,
+              children: _daysOfWeek.map((day) {
+                final isSelected = _selectedDays.contains(day);
+                return FilterChip(
+                  label: Text(day),
+                  selected: isSelected,
+                  onSelected: (bool selected) {
+                    setState(() {
+                      if (selected) {
+                        _selectedDays.add(day);
+                      } else {
+                        _selectedDays.remove(day);
+                      }
+                    });
+                  },
+                  selectedColor: AppColors.primaryColor.withAlpha((0.2 * 255).toInt()),
+                  checkmarkColor: AppColors.primaryColor,
+                  labelStyle: TextStyle(
+                    color: isSelected ? AppColors.primaryColor : Colors.black,
+                  ),
+                );
+              }).toList(),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: _handleSubmit,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Text(
-                    widget.timetable == null ? 'Add Timetable' : 'Update Timetable',
-                    style: const TextStyle(fontSize: 16),
-                  ),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: Text(
+                  isEdit ? 'Update Timetable' : 'Add Timetable',
+                  style: const TextStyle(fontSize: 16),
                 ),
               ),
             ),

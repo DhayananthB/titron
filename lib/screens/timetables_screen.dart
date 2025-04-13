@@ -112,7 +112,7 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
             Navigator.of(dialogContext).pop();
             try {
               final newTimetable = Timetable(
-                id: '', // Let the backend assign ID
+                id: '',
                 name: timetable.name,
                 days: timetable.days,
                 isActive: false,
@@ -131,6 +131,38 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
               debugPrint(stackTrace.toString());
               if (mounted) {
                 showErrorDialog(context, 'Failed to add timetable', e.toString());
+              }
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  void _showEditTimetableDialog(Timetable timetable) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        child: TimetableForm(
+          timetable: timetable,
+          onSubmit: (Timetable updatedTimetable) async {
+            Navigator.of(dialogContext).pop();
+            try {
+              final updated = await _apiService.updateTimetable(updatedTimetable);
+              setState(() {
+                final index = _timetables.indexWhere((t) => t.id == timetable.id);
+                if (index != -1) {
+                  _timetables[index] = updated;
+                }
+              });
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Timetable updated successfully')),
+                );
+              }
+            } catch (e) {
+              if (mounted) {
+                showErrorDialog(context, 'Failed to update timetable', e.toString());
               }
             }
           },
@@ -227,6 +259,11 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.end,
                                       children: [
+                                        TextButton.icon(
+                                          onPressed: () => _showEditTimetableDialog(timetable),
+                                          icon: const Icon(Icons.edit),
+                                          label: const Text('Edit'),
+                                        ),
                                         if (!timetable.isActive)
                                           TextButton.icon(
                                             onPressed: () => _setActiveTimetable(timetable),

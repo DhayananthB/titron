@@ -44,31 +44,101 @@ class ApiService {
           isActive: false, // New timetables are not active by default
         );
       } else {
-        final errorData = json.decode(response.body);
-        throw Exception(errorData['error'] ?? 'Failed to add timetable');
+        // Try to parse error message if possible
+        try {
+          final errorData = json.decode(response.body);
+          throw Exception(errorData['error'] ?? 'Failed to add timetable');
+        } catch (jsonError) {
+          // If response isn't valid JSON
+          throw Exception('Failed to add timetable: ${response.statusCode}');
+        }
       }
     } catch (e) {
       throw Exception('Failed to add timetable: $e');
     }
   }
 
-  // Delete a timetable - No changes needed
-  Future<void> deleteTimetable(String id) async {
-    final response = await http.delete(Uri.parse('$baseUrl/timetables/$id'));
-    
-    if (response.statusCode != 200) {
-      throw Exception('Failed to delete timetable');
+  // Update an existing timetable - With improved error handling
+  Future<Timetable> updateTimetable(Timetable timetable) async {
+    try {
+      // Print debug info
+      print('Updating timetable with ID: ${timetable.id}');
+      print('Request body: ${json.encode({
+        'name': timetable.name,
+        'days': timetable.days,
+      })}');
+      
+      final response = await http.put(
+        Uri.parse('$baseUrl/timetables/${timetable.id}'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'name': timetable.name,
+          'days': timetable.days,
+        }),
+      );
+
+      // Debug output for response
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body.substring(0, min(100, response.body.length))}...');
+
+      if (response.statusCode == 200) {
+        try {
+          return Timetable.fromJson(json.decode(response.body));
+        } catch (parseError) {
+          print('Failed to parse response: $parseError');
+          throw Exception('Error parsing server response: $parseError');
+        }
+      } else {
+        // Safely handle error - don't assume JSON response
+        try {
+          final errorData = json.decode(response.body);
+          throw Exception(errorData['error'] ?? 'Failed to update timetable');
+        } catch (jsonError) {
+          // If response isn't valid JSON
+          throw Exception('Server returned status code ${response.statusCode}');
+        }
+      }
+    } catch (e) {
+      print('Exception during update: $e');
+      throw Exception('Error updating timetable: $e');
     }
   }
 
-  // Set a timetable as active - No changes needed
+  // Delete a timetable - With improved error handling
+  Future<void> deleteTimetable(String id) async {
+    try {
+      final response = await http.delete(Uri.parse('$baseUrl/timetables/$id'));
+      
+      if (response.statusCode != 200) {
+        try {
+          final errorData = json.decode(response.body);
+          throw Exception(errorData['error'] ?? 'Failed to delete timetable');
+        } catch (jsonError) {
+          throw Exception('Failed to delete timetable: ${response.statusCode}');
+        }
+      }
+    } catch (e) {
+      throw Exception('Error deleting timetable: $e');
+    }
+  }
+
+  // Set a timetable as active - With improved error handling
   Future<void> setActiveTimetable(String id) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/timetables/$id/set-active'),
-    );
-    
-    if (response.statusCode != 200) {
-      throw Exception('Failed to set active timetable');
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/timetables/$id/set-active'),
+      );
+      
+      if (response.statusCode != 200) {
+        try {
+          final errorData = json.decode(response.body);
+          throw Exception(errorData['error'] ?? 'Failed to set active timetable'); 
+        } catch (jsonError) {
+          throw Exception('Failed to set active timetable: ${response.statusCode}');
+        }
+      }
+    } catch (e) {
+      throw Exception('Error setting active timetable: $e');
     }
   }
 
@@ -110,4 +180,9 @@ class ApiService {
       throw Exception('Failed to delete schedule');
     }
   }
+}
+
+// Helper function for string length safety
+int min(int a, int b) {
+  return (a < b) ? a : b;
 }
