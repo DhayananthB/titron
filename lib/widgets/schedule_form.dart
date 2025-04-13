@@ -21,7 +21,7 @@ class _ScheduleFormState extends State<ScheduleForm> {
   final _formKey = GlobalKey<FormState>();
   Timetable? _selectedTimetable;
   TimeOfDay _selectedTime = TimeOfDay.now();
-  String _selectedBellType = 'Short';
+  String _selectedBellType = 'shortbell';
   final Map<String, bool> _selectedDays = {
     'Monday': false,
     'Tuesday': false,
