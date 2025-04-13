@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:timetable_manager/models/models.dart';
 import 'package:timetable_manager/utils/colors.dart';
-import 'package:timetable_manager/utils/time_utils.dart'; // for time formatting
+import 'package:timetable_manager/utils/time_utils.dart';
 
 class ScheduleForm extends StatefulWidget {
   final List<Timetable> timetables;
@@ -22,15 +22,7 @@ class _ScheduleFormState extends State<ScheduleForm> {
   Timetable? _selectedTimetable;
   TimeOfDay _selectedTime = TimeOfDay.now();
   String _selectedBellType = 'shortbell';
-  final Map<String, bool> _selectedDays = {
-    'Monday': false,
-    'Tuesday': false,
-    'Wednesday': false,
-    'Thursday': false,
-    'Friday': false,
-    'Saturday': false,
-    'Sunday': false,
-  };
+  final Map<String, bool> _selectedDays = {};
 
   Future<void> _pickTime() async {
     final TimeOfDay? picked = await showTimePicker(
@@ -42,6 +34,15 @@ class _ScheduleFormState extends State<ScheduleForm> {
         _selectedTime = picked;
       });
     }
+  }
+
+  void _updateSelectedDays(List<String> days) {
+    setState(() {
+      _selectedDays.clear();
+      for (var day in days) {
+        _selectedDays[day] = false;
+      }
+    });
   }
 
   void _submitForm() {
@@ -105,6 +106,9 @@ class _ScheduleFormState extends State<ScheduleForm> {
               onChanged: (value) {
                 setState(() {
                   _selectedTimetable = value;
+                  if (value != null) {
+                    _updateSelectedDays(value.days);
+                  }
                 });
               },
               validator: (value) =>
@@ -149,25 +153,27 @@ class _ScheduleFormState extends State<ScheduleForm> {
             const SizedBox(height: 16),
 
             // Days selection
-            const Text(
-              'Days:',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-            ),
-            ..._selectedDays.entries.map(
-              (entry) => CheckboxListTile(
-                title: Text(entry.key),
-                value: entry.value,
-                activeColor: AppColors.primaryColor,
-                onChanged: (value) {
-                  setState(() {
-                    _selectedDays[entry.key] = value ?? false;
-                  });
-                },
-                dense: true,
-                contentPadding: EdgeInsets.zero,
+            if (_selectedTimetable != null) ...[
+              const Text(
+                'Days:',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
               ),
-            ),
-            const SizedBox(height: 24),
+              ..._selectedDays.entries.map(
+                (entry) => CheckboxListTile(
+                  title: Text(entry.key),
+                  value: entry.value,
+                  activeColor: AppColors.primaryColor,
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedDays[entry.key] = value ?? false;
+                    });
+                  },
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
 
             // Submit Button
             SizedBox(
