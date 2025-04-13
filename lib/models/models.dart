@@ -1,9 +1,11 @@
-// Timetable Model with proper null safety and API matching
+// models.dart
+
+/// Timetable Model with proper null safety and API matching
 class Timetable {
   final String id;
   final String name;
   final List<String> days;
-   bool isActive;
+  bool isActive;
 
   Timetable({
     required this.id,
@@ -14,13 +16,13 @@ class Timetable {
 
   factory Timetable.fromJson(Map<String, dynamic> json) {
     return Timetable(
-      id: json['id']?.toString() ?? '', // Handle null and conversion
-      name: json['name']?.toString() ?? 'Unnamed Timetable', // Handle null
-      days: (json['days'] as List<dynamic>? ?? []) // Handle null and type conversion
-          .map((day) => day?.toString() ?? '') // Ensure each day is String
-          .where((day) => day.isNotEmpty) // Filter out empty strings
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? 'Unnamed Timetable',
+      days: (json['days'] as List<dynamic>? ?? [])
+          .map((day) => day?.toString() ?? '')
+          .where((day) => day.isNotEmpty)
           .toList(),
-      isActive: json['is_active'] as bool? ?? false, // Handle null and different field name
+      isActive: json['is_active'] as bool? ?? false,
     );
   }
 
@@ -28,13 +30,12 @@ class Timetable {
     return {
       'name': name,
       'days': days,
-      // Note: We don't include id or isActive when sending to API
-      // as your API handles these server-side
+      // 'id' and 'isActive' are typically managed server-side and not sent when creating/updating
     };
   }
 }
 
-// Schedule Model with proper null safety
+/// Schedule Model with proper null safety and API mapping
 class Schedule {
   final String? id;
   final String time;
@@ -47,25 +48,25 @@ class Schedule {
     required this.time,
     required this.days,
     required this.timetableId,
-    this.bellType = 'shortbell', // Default value
+    this.bellType = 'shortbell',
   });
 
   factory Schedule.fromJson(Map<String, dynamic> json) {
     return Schedule(
-      id: json['id']?.toString(), // Handle null
-      time: json['time']?.toString() ?? '', // Handle null
-      days: (json['days'] as List<dynamic>? ?? []) // Handle null
-          .map((day) => day?.toString() ?? '') // Ensure String
-          .where((day) => day.isNotEmpty) // Filter empty
+      id: json['id']?.toString(),
+      time: json['time']?.toString() ?? '',
+      days: (json['days'] as List<dynamic>? ?? [])
+          .map((day) => day?.toString() ?? '')
+          .where((day) => day.isNotEmpty)
           .toList(),
-      timetableId: json['timetable_id']?.toString() ?? '', // Handle null
-      bellType: json['bell_type']?.toString() ?? 'shortbell', // Handle null with default
+      timetableId: json['timetable_id']?.toString() ?? '',
+      bellType: json['bell_type']?.toString() ?? 'shortbell',
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      if (id != null) 'id': id, // Only include if not null
+      if (id != null) 'id': id,
       'time': time,
       'days': days,
       'timetable_id': timetableId,

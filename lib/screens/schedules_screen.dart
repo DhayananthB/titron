@@ -1,3 +1,4 @@
+// Updated schedules_screen.dart without page reload on add/delete
 import 'package:flutter/material.dart';
 import 'package:timetable_manager/models/models.dart';
 import 'package:timetable_manager/services/api_service.dart';
@@ -18,90 +19,79 @@ class SchedulesScreen extends StatefulWidget {
 
 class _SchedulesScreenState extends State<SchedulesScreen> {
   final ApiService _apiService = ApiService();
-  late Future<List<Timetable>> _timetablesFuture;
-  late Future<List<Schedule>> _schedulesFuture;
+  List<Timetable> _timetables = [];
+  List<Schedule> _schedules = [];
   String? _selectedTimetableId;
-  
+  bool _isLoading = true;
+
   @override
   void initState() {
     super.initState();
-    _refreshData();
+    _loadData();
   }
-  
-  void _refreshData() {
-    setState(() {
-      _timetablesFuture = _apiService.fetchTimetables();
-      _schedulesFuture = _apiService.fetchSchedules(timetableId: _selectedTimetableId);
-    });
+
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+    try {
+      final timetables = await _apiService.fetchTimetables();
+      final schedules = await _apiService.fetchSchedules(timetableId: _selectedTimetableId);
+      if (!mounted) return;
+      setState(() {
+        _timetables = timetables;
+        _schedules = schedules;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      showErrorDialog(context, 'Failed to load data', e.toString());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
-  
+
   Future<void> _deleteSchedule(Schedule schedule) async {
-    if (!mounted) return;
-    
-    bool confirm = await showDialog(
+    final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Schedule'),
-        content: Text('Are you sure you want to delete this schedule?'),
+        content: const Text('Are you sure you want to delete this schedule?'),
         actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
+            onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: AppColors.dangerColor),
             child: const Text('Delete'),
           ),
         ],
       ),
-    ) ?? false;
-    
-    if (!mounted) return;
-    
-    if (confirm) {
-      try {
-        if (schedule.id != null) {
-          await _apiService.deleteSchedule(schedule.id!);
-          
-          if (!mounted) return;
-          
-          _refreshData();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Schedule deleted successfully')),
-          );
-        }
-      } catch (e) {
-        if (!mounted) return;
-        showErrorDialog(context, 'Failed to delete schedule', e.toString());
-      }
+    );
+    if (confirm != true || schedule.id == null) return;
+
+    try {
+      await _apiService.deleteSchedule(schedule.id!);
+      if (!mounted) return;
+      setState(() => _schedules.removeWhere((s) => s.id == schedule.id));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Schedule deleted')));
+    } catch (e) {
+      if (!mounted) return;
+      showErrorDialog(context, 'Delete failed', e.toString());
     }
   }
-  
-  void _showAddScheduleDialog(List<Timetable> timetables) {
-    if (!mounted) return;
-    
+
+  void _showAddScheduleDialog() {
     showDialog(
       context: context,
       builder: (dialogContext) => Dialog(
         child: ScheduleForm(
-          timetables: timetables,
+          timetables: _timetables,
           onSubmit: (Schedule schedule) async {
             try {
               await _apiService.addSchedule(schedule);
-              
-              // Use dialogContext to close the dialog
-              if (dialogContext.mounted) {
-                Navigator.of(dialogContext).pop();
-              }
-              
-              // Use the widget's mounting state for the main screen
+              if (!mounted || !dialogContext.mounted) return;
+              Navigator.pop(dialogContext);
+              final updatedSchedules = await _apiService.fetchSchedules(timetableId: _selectedTimetableId);
               if (!mounted) return;
-              
-              _refreshData();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Schedule added successfully')),
-              );
+              setState(() => _schedules = updatedSchedules);
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Schedule added')));
             } catch (e) {
               if (!mounted) return;
               showErrorDialog(context, 'Failed to add schedule', e.toString());
@@ -111,7 +101,7 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
       ),
     );
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -123,101 +113,46 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Schedules',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: AppColors.secondaryColor,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                FutureBuilder<List<Timetable>>(
-                  future: _timetablesFuture,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting ||
-                        snapshot.hasError ||
-                        !snapshot.hasData) {
-                      return const SizedBox();
-                    }
-                    
-                    final timetables = snapshot.data!;
-                    
-                    return Row(
-                      children: [
-                        DropdownButton<String>(
-                          hint: const Text('All Timetables'),
-                          value: _selectedTimetableId,
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedTimetableId = value;
-                              _schedulesFuture = _apiService.fetchSchedules(
-                                timetableId: _selectedTimetableId,
-                              );
-                            });
-                          },
-                          items: [
-                            const DropdownMenuItem<String>(
-                              value: null,
-                              child: Text('All Timetables'),
-                            ),
-                            ...timetables.map((timetable) => DropdownMenuItem<String>(
-                              value: timetable.id,
-                              child: Text(timetable.name),
-                            )),
-                          ],
-                        ),
-                        const SizedBox(width: 16),
-                        ElevatedButton.icon(
-                          onPressed: timetables.isEmpty
-                              ? null
-                              : () => _showAddScheduleDialog(timetables),
-                          icon: const Icon(Icons.add),
-                          label: const Text('Add Schedule'),
-                        ),
+                Text('Schedules', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: AppColors.secondaryColor)),
+                Row(
+                  children: [
+                    DropdownButton<String>(
+                      hint: const Text('All Timetables'),
+                      value: _selectedTimetableId,
+                      onChanged: (value) async {
+                        setState(() => _selectedTimetableId = value);
+                        final schedules = await _apiService.fetchSchedules(timetableId: value);
+                        if (mounted) setState(() => _schedules = schedules);
+                      },
+                      items: [
+                        const DropdownMenuItem<String>(value: null, child: Text('All Timetables')),
+                        ..._timetables.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))),
                       ],
-                    );
-                  },
+                    ),
+                    const SizedBox(width: 16),
+                    ElevatedButton.icon(
+                      onPressed: _timetables.isEmpty ? null : _showAddScheduleDialog,
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add Schedule'),
+                    ),
+                  ],
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            Expanded(
-              child: FutureBuilder<List<Schedule>>(
-                future: _schedulesFuture,
-                builder: (context, scheduleSnapshot) {
-                  if (scheduleSnapshot.connectionState == ConnectionState.waiting) {
-                    return const LoadingIndicator();
-                  } else if (scheduleSnapshot.hasError) {
-                    return Center(
-                      child: Text(
-                        'Error loading schedules: ${scheduleSnapshot.error}',
-                        style: TextStyle(color: AppColors.dangerColor),
-                      ),
-                    );
-                  } else if (!scheduleSnapshot.hasData || scheduleSnapshot.data!.isEmpty) {
-                    return const Center(
-                      child: Text('No schedules found'),
-                    );
-                  } else {
-                    final schedules = scheduleSnapshot.data!;
-                    
-                    return FutureBuilder<List<Timetable>>(
-                      future: _timetablesFuture,
-                      builder: (context, timetableSnapshot) {
-                        if (timetableSnapshot.connectionState == ConnectionState.waiting ||
-                            timetableSnapshot.hasError ||
-                            !timetableSnapshot.hasData) {
-                          return const LoadingIndicator();
-                        }
-                        
-                        final timetables = timetableSnapshot.data!;
-                        final timetableMap = {for (var t in timetables) t.id: t};
-                        
-                        return ListView.builder(
-                          itemCount: schedules.length,
+            _isLoading
+                ? const LoadingIndicator()
+                : _schedules.isEmpty
+                    ? const Center(child: Text('No schedules found'))
+                    : Expanded(
+                        child: ListView.builder(
+                          itemCount: _schedules.length,
                           itemBuilder: (context, index) {
-                            final schedule = schedules[index];
-                            final timetable = timetableMap[schedule.timetableId];
-                            
+                            final schedule = _schedules[index];
+                            final timetable = _timetables.firstWhere(
+                              (t) => t.id == schedule.timetableId,
+                              orElse: () => Timetable(id: '', name: 'Unknown', days: []),
+                            );
                             return Card(
                               margin: const EdgeInsets.only(bottom: 12),
                               child: Padding(
@@ -228,33 +163,17 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Text(
-                                          FormatUtils.formatTime(schedule.time),
-                                          style: const TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
+                                        Text(FormatUtils.formatTime(schedule.time), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                                         BellBadge(bellType: schedule.bellType),
                                       ],
                                     ),
-                                    if (timetable != null) ...[
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        'Timetable: ${timetable.name}',
-                                        style: TextStyle(
-                                          color: AppColors.secondaryColor,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
+                                    const SizedBox(height: 8),
+                                    Text('Timetable: ${timetable.name}', style: TextStyle(fontWeight: FontWeight.w500, color: AppColors.secondaryColor)),
                                     const SizedBox(height: 8),
                                     Wrap(
                                       spacing: 8,
                                       runSpacing: 8,
-                                      children: schedule.days
-                                          .map((day) => DayBadge(day: day))
-                                          .toList(),
+                                      children: schedule.days.map((d) => DayBadge(day: d)).toList(),
                                     ),
                                     const SizedBox(height: 16),
                                     Row(
@@ -263,25 +182,18 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
                                         TextButton.icon(
                                           onPressed: () => _deleteSchedule(schedule),
                                           icon: const Icon(Icons.delete_outline),
-                                          style: TextButton.styleFrom(
-                                            foregroundColor: AppColors.dangerColor,
-                                          ),
+                                          style: TextButton.styleFrom(foregroundColor: AppColors.dangerColor),
                                           label: const Text('Delete'),
                                         ),
                                       ],
-                                    ),
+                                    )
                                   ],
                                 ),
                               ),
                             );
                           },
-                        );
-                      },
-                    );
-                  }
-                },
-              ),
-            ),
+                        ),
+                      ),
           ],
         ),
       ),
