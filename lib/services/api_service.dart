@@ -62,11 +62,6 @@ class ApiService {
   Future<Timetable> updateTimetable(Timetable timetable) async {
     try {
       // Print debug info
-      print('Updating timetable with ID: ${timetable.id}');
-      print('Request body: ${json.encode({
-        'name': timetable.name,
-        'days': timetable.days,
-      })}');
       
       final response = await http.put(
         Uri.parse('$baseUrl/timetables/${timetable.id}'),
@@ -78,14 +73,11 @@ class ApiService {
       );
 
       // Debug output for response
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body.substring(0, min(100, response.body.length))}...');
 
       if (response.statusCode == 200) {
         try {
           return Timetable.fromJson(json.decode(response.body));
         } catch (parseError) {
-          print('Failed to parse response: $parseError');
           throw Exception('Error parsing server response: $parseError');
         }
       } else {
@@ -99,7 +91,6 @@ class ApiService {
         }
       }
     } catch (e) {
-      print('Exception during update: $e');
       throw Exception('Error updating timetable: $e');
     }
   }
